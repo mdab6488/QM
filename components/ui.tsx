@@ -36,7 +36,7 @@ export function Stat({
   label: string;
   value: ReactNode;
   hint?: ReactNode;
-  tone?: "default" | "win" | "loss" | "warn";
+  tone?: "default" | "win" | "loss" | "warn" | "brand";
 }) {
   const toneCls =
     tone === "win"
@@ -45,6 +45,8 @@ export function Stat({
       ? "text-loss"
       : tone === "warn"
       ? "text-warn"
+      : tone === "brand"
+      ? "text-brand"
       : "text-text";
   return (
     <div className="card p-4">
