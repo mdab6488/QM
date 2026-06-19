@@ -25,6 +25,19 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Format an ISO timestamp as a readable date + time (falls back gracefully). */
+export function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function sameDay(a: string, b: string): boolean {
   return a.slice(0, 10) === b.slice(0, 10);
 }

@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { Hydrated } from "@/components/Hydrated";
 import { Badge, Field, Input, Modal, SectionTitle, Select, Stat, Textarea } from "@/components/ui";
 import { Group, Session, SessionEntry, SessionOutcome } from "@/lib/types";
-import { fmtMoney, fmtPct } from "@/lib/utils";
+import { fmtMoney, fmtPct, fmtDateTime } from "@/lib/utils";
 import { computeGroup, computeSession, entryPnl, nextGroupName, nextSessionName } from "@/lib/stats";
 import { DEFAULT_DEPOSIT, DEFAULT_GOAL } from "@/lib/constants";
 import {
@@ -438,7 +438,7 @@ function SessionList({
             >
               <div>
                 <div className={`text-sm font-medium ${active ? "text-brand" : ""}`}>{s.name}</div>
-                <div className="text-[11px] text-muted">{s.date}</div>
+                <div className="text-[11px] text-muted">{fmtDateTime(s.date)}</div>
               </div>
               <span
                 className={`text-sm tabular-nums font-medium ${
@@ -503,7 +503,7 @@ function SessionDetail({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-base font-semibold">{session.name}</h3>
-            <span className="text-xs text-muted">{session.date}</span>
+            <span className="text-xs text-muted">{fmtDateTime(session.date)}</span>
           </div>
           <div className="text-2xl font-semibold tabular-nums mt-1">
             {fmtMoney(session.capital, currency)}
@@ -679,7 +679,7 @@ function SessionDetail({
 
 // ---- Forms ----
 
-type SessionFormData = Omit<Session, "id" | "entries" | "groupId" | "name" | "capital">;
+type SessionFormData = Omit<Session, "id" | "entries" | "groupId" | "name" | "capital" | "date">;
 
 function GroupForm({
   groups,
@@ -874,16 +874,16 @@ function SessionForm({
   onSubmit: (d: SessionFormData) => void;
   onCancel: () => void;
 }) {
-  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [steps, setSteps] = useState(initial?.steps ?? 5);
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const when = initial?.date ?? new Date().toISOString();
 
   return (
     <form
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ date, steps: Number(steps) || 1, notes });
+        onSubmit({ steps: Number(steps) || 1, notes });
       }}
     >
       <div className="rounded-lg bg-panel2 px-3 py-2 text-sm flex items-center justify-between gap-3">
@@ -897,12 +897,9 @@ function SessionForm({
         </span>
       </div>
       <p className="text-xs text-muted -mt-1">
-        Capital is set automatically from the group balance.
+        Name, capital and date ({fmtDateTime(when)}) are set automatically.
       </p>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Date">
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
         <Field label="Plan steps">
           <Input type="number" min={1} value={steps} onChange={(e) => setSteps(e.target.valueAsNumber)} />
         </Field>
