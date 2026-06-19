@@ -344,12 +344,22 @@ function MoneyManagement() {
                 ? selectedSession?.name ?? ""
                 : nextSessionName(groupSessions)
             }
+            capital={
+              sessionModal === "edit"
+                ? selectedSession?.capital ?? 0
+                : gstats?.balance ?? 0
+            }
+            currency={cur}
             onCancel={() => setSessionModal(null)}
             onSubmit={(data) => {
               if (sessionModal === "edit" && selectedSession) {
                 updateSession(selectedSession.id, data);
               } else {
-                const id = addSession({ ...data, groupId: activeGroup.id });
+                const id = addSession({
+                  ...data,
+                  groupId: activeGroup.id,
+                  capital: gstats?.balance ?? 0,
+                });
                 setSelectedSessionId(id);
               }
               setSessionModal(null);
@@ -669,7 +679,7 @@ function SessionDetail({
 
 // ---- Forms ----
 
-type SessionFormData = Omit<Session, "id" | "entries" | "groupId" | "name">;
+type SessionFormData = Omit<Session, "id" | "entries" | "groupId" | "name" | "capital">;
 
 function GroupForm({
   groups,
@@ -852,16 +862,19 @@ function TxnForm({
 function SessionForm({
   initial,
   name,
+  capital,
+  currency,
   onSubmit,
   onCancel,
 }: {
   initial?: Session;
   name: string;
+  capital: number;
+  currency: string;
   onSubmit: (d: SessionFormData) => void;
   onCancel: () => void;
 }) {
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
-  const [capital, setCapital] = useState(initial?.capital ?? 500);
   const [steps, setSteps] = useState(initial?.steps ?? 5);
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
@@ -870,27 +883,32 @@ function SessionForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ date, capital: Number(capital) || 0, steps: Number(steps) || 1, notes });
+        onSubmit({ date, steps: Number(steps) || 1, notes });
       }}
     >
-      <div className="rounded-lg bg-panel2 px-3 py-2 text-sm">
-        <span className="text-muted">Session: </span>
-        <span className="font-medium">{name}</span>
-        <span className="text-muted text-xs"> (auto-numbered)</span>
+      <div className="rounded-lg bg-panel2 px-3 py-2 text-sm flex items-center justify-between gap-3">
+        <span>
+          <span className="text-muted">Session: </span>
+          <span className="font-medium">{name}</span>
+        </span>
+        <span>
+          <span className="text-muted">Capital: </span>
+          <span className="font-medium tabular-nums">{fmtMoney(capital, currency)}</span>
+        </span>
       </div>
+      <p className="text-xs text-muted -mt-1">
+        Capital is set automatically from the group balance.
+      </p>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-        <Field label="Capital (bankroll)">
-          <Input type="number" step="any" value={capital} onChange={(e) => setCapital(e.target.valueAsNumber)} />
         </Field>
         <Field label="Plan steps">
           <Input type="number" min={1} value={steps} onChange={(e) => setSteps(e.target.valueAsNumber)} />
         </Field>
       </div>
       <div className="text-xs text-muted -mt-1">
-        Base size per step ≈ {(Number(capital) / (Number(steps) || 1) || 0).toFixed(2)}
+        Base size per step ≈ {fmtMoney(capital / (Number(steps) || 1) || 0, currency)}
       </div>
       <Field label="Notes">
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Plan, conditions, market…" />
