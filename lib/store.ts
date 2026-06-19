@@ -13,7 +13,7 @@ import {
   TradingRule,
 } from "./types";
 import { uid } from "./utils";
-import { nextGroupName } from "./stats";
+import { nextGroupName, nextSessionName } from "./stats";
 
 const DEFAULT_SETTINGS: Settings = {
   traderName: "Trader",
@@ -41,7 +41,8 @@ interface StoreActions {
   addTxn: (groupId: string, t: Omit<GroupTxn, "id">) => void;
   deleteTxn: (groupId: string, txnId: string) => void;
 
-  addSession: (s: Omit<Session, "id" | "entries">) => string;
+  /** Create a session. Name is auto-generated in sequence within its group. */
+  addSession: (s: Omit<Session, "id" | "entries" | "name">) => string;
   updateSession: (id: string, patch: Partial<Omit<Session, "id" | "entries">>) => void;
   deleteSession: (id: string) => void;
   addEntry: (sessionId: string, e: Omit<SessionEntry, "id">) => void;
@@ -152,7 +153,11 @@ export const useStore = create<Store>()((set) => ({
 
       addSession: (s) => {
         const id = uid();
-        set((st) => ({ sessions: [...st.sessions, { ...s, id, entries: [] }] }));
+        set((st) => {
+          const inGroup = st.sessions.filter((x) => x.groupId === s.groupId);
+          const name = nextSessionName(inGroup);
+          return { sessions: [...st.sessions, { ...s, id, name, entries: [] }] };
+        });
         return id;
       },
       updateSession: (id, patch) =>

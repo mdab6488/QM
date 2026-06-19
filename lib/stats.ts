@@ -290,6 +290,15 @@ export function nextGroupName(groups: Group[]): string {
   return `Group ${max + 1}`;
 }
 
+/** Next sequential session name within a group: one past the highest "S N". */
+export function nextSessionName(sessionsInGroup: Session[]): string {
+  const max = sessionsInGroup.reduce((m, s) => {
+    const match = /^S\s*(\d+)$/i.exec(s.name.trim());
+    return match ? Math.max(m, parseInt(match[1], 10)) : m;
+  }, 0);
+  return `S${max + 1}`;
+}
+
 export function computeGroup(group: Group, allSessions: Session[]): GroupStats {
   const mine = allSessions.filter((s) => s.groupId === group.id);
   const sessionsNet = round2(sum(mine.map((s) => computeSession(s).net)));

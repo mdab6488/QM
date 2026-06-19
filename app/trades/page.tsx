@@ -6,7 +6,7 @@ import { Hydrated } from "@/components/Hydrated";
 import { Badge, Field, Input, Modal, SectionTitle, Select, Stat, Textarea } from "@/components/ui";
 import { Group, Session, SessionEntry, SessionOutcome } from "@/lib/types";
 import { fmtMoney, fmtPct } from "@/lib/utils";
-import { computeGroup, computeSession, entryPnl, nextGroupName } from "@/lib/stats";
+import { computeGroup, computeSession, entryPnl, nextGroupName, nextSessionName } from "@/lib/stats";
 import { DEFAULT_DEPOSIT, DEFAULT_GOAL } from "@/lib/constants";
 import {
   Plus,
@@ -339,7 +339,11 @@ function MoneyManagement() {
         {activeGroup && (
           <SessionForm
             initial={sessionModal === "edit" ? selectedSession ?? undefined : undefined}
-            suggestedName={`S${groupSessions.length + 1}`}
+            name={
+              sessionModal === "edit"
+                ? selectedSession?.name ?? ""
+                : nextSessionName(groupSessions)
+            }
             onCancel={() => setSessionModal(null)}
             onSubmit={(data) => {
               if (sessionModal === "edit" && selectedSession) {
@@ -665,7 +669,7 @@ function SessionDetail({
 
 // ---- Forms ----
 
-type SessionFormData = Omit<Session, "id" | "entries" | "groupId">;
+type SessionFormData = Omit<Session, "id" | "entries" | "groupId" | "name">;
 
 function GroupForm({
   groups,
@@ -847,16 +851,15 @@ function TxnForm({
 
 function SessionForm({
   initial,
-  suggestedName,
+  name,
   onSubmit,
   onCancel,
 }: {
   initial?: Session;
-  suggestedName: string;
+  name: string;
   onSubmit: (d: SessionFormData) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(initial?.name ?? suggestedName);
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [capital, setCapital] = useState(initial?.capital ?? 500);
   const [steps, setSteps] = useState(initial?.steps ?? 5);
@@ -867,13 +870,15 @@ function SessionForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ name: name.trim() || "S?", date, capital: Number(capital) || 0, steps: Number(steps) || 1, notes });
+        onSubmit({ date, capital: Number(capital) || 0, steps: Number(steps) || 1, notes });
       }}
     >
+      <div className="rounded-lg bg-panel2 px-3 py-2 text-sm">
+        <span className="text-muted">Session: </span>
+        <span className="font-medium">{name}</span>
+        <span className="text-muted text-xs"> (auto-numbered)</span>
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Session name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="S1" />
-        </Field>
         <Field label="Date">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
