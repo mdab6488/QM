@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Wallet,
-  ShieldCheck,
   Brain,
   Newspaper,
   Settings,
@@ -14,7 +13,6 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/trades", label: "Money Management", icon: Wallet },
-  { href: "/money2", label: "Money Management 2", icon: ShieldCheck },
   { href: "/psychology", label: "Psychology", icon: Brain },
   { href: "/news", label: "News & Calendar", icon: Newspaper },
   { href: "/settings", label: "Settings", icon: Settings },
