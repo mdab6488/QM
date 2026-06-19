@@ -4,58 +4,237 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Hydrated } from "@/components/Hydrated";
 import { Badge, Field, Input, Modal, SectionTitle, Select, Stat, Textarea } from "@/components/ui";
-import { Session, SessionEntry, SessionOutcome } from "@/lib/types";
+import { Group, Session, SessionEntry, SessionOutcome } from "@/lib/types";
 import { fmtMoney, fmtPct } from "@/lib/utils";
-import { computeSession, entryPnl, summarizeSessions } from "@/lib/stats";
-import { Plus, Pencil, Trash2, Layers, ArrowDownUp } from "lucide-react";
+import { computeGroup, computeSession, entryPnl } from "@/lib/stats";
+import { DEFAULT_DEPOSIT, DEFAULT_GOAL } from "@/lib/constants";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Layers,
+  ArrowDownUp,
+  Target,
+  ArrowUpFromLine,
+  ArrowDownToLine,
+  FolderPlus,
+} from "lucide-react";
 
 export default function TradesPage() {
   return (
     <Hydrated>
-      <Journal />
+      <MoneyManagement />
     </Hydrated>
   );
 }
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
 
-function Journal() {
+function MoneyManagement() {
+  const groups = useStore((s) => s.groups);
   const sessions = useStore((s) => s.sessions);
   const settings = useStore((s) => s.settings);
-  const loadSeed = useStore((s) => s.loadSeed);
+  const addGroup = useStore((s) => s.addGroup);
+  const updateGroup = useStore((s) => s.updateGroup);
+  const deleteGroup = useStore((s) => s.deleteGroup);
+  const addTxn = useStore((s) => s.addTxn);
   const addSession = useStore((s) => s.addSession);
   const updateSession = useStore((s) => s.updateSession);
   const deleteSession = useStore((s) => s.deleteSession);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [groupModal, setGroupModal] = useState<"add" | "edit" | null>(null);
+  const [txnModal, setTxnModal] = useState<"DEPOSIT" | "WITHDRAW" | null>(null);
   const [sessionModal, setSessionModal] = useState<"add" | "edit" | null>(null);
 
-  const ordered = useMemo(
-    () => [...sessions].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name)),
-    [sessions]
-  );
-  const summary = useMemo(() => summarizeSessions(sessions), [sessions]);
-
-  // Keep a session selected once data exists.
-  const selected =
-    ordered.find((s) => s.id === selectedId) ?? ordered[ordered.length - 1] ?? null;
-
   const cur = settings.currency;
+  const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null;
+
+  const groupSessions = useMemo(
+    () =>
+      activeGroup
+        ? [...sessions]
+            .filter((s) => s.groupId === activeGroup.id)
+            .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name))
+        : [],
+    [sessions, activeGroup]
+  );
+  const gstats = useMemo(
+    () => (activeGroup ? computeGroup(activeGroup, sessions) : null),
+    [activeGroup, sessions]
+  );
+
+  const selectedSession =
+    groupSessions.find((s) => s.id === selectedSessionId) ??
+    groupSessions[groupSessions.length - 1] ??
+    null;
+
+  // --- Empty state -------------------------------------------------------
+  if (!groups.length) {
+    return (
+      <div className="space-y-4">
+        <SectionTitle title="Money Management" subtitle="Fund a group, trade sessions toward your goal" />
+        <div className="card p-10 text-center">
+          <p className="text-text font-medium">No groups yet</p>
+          <p className="text-sm text-muted mt-1 max-w-md mx-auto">
+            A group is one run: deposit a starting amount (e.g. {fmtMoney(DEFAULT_DEPOSIT, cur)}) and
+            trade sessions toward your goal ({fmtMoney(DEFAULT_GOAL, cur)}). Create one to begin.
+          </p>
+          <div className="flex gap-2 justify-center mt-4">
+            <button className="btn-primary" onClick={() => setGroupModal("add")}>
+              <FolderPlus size={15} /> New group
+            </button>
+          </div>
+        </div>
+        <Modal open={groupModal !== null} onClose={() => setGroupModal(null)} title="New group">
+          <GroupForm
+            groups={groups}
+            currency={cur}
+            onCancel={() => setGroupModal(null)}
+            onCreate={(data, fundFrom) => {
+              const id = addGroup(data, fundFrom);
+              setActiveGroupId(id);
+              setGroupModal(null);
+            }}
+          />
+        </Modal>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <SectionTitle
-        title="Trade Journal"
-        subtitle={`${sessions.length} session${sessions.length === 1 ? "" : "s"} · bankroll money-management tracker`}
+        title="Money Management"
+        subtitle={`${groups.length} group${groups.length === 1 ? "" : "s"} · deposit → sessions → goal`}
         right={
-          <div className="flex flex-wrap gap-2">
-            {!sessions.length && (
-              <button className="btn-ghost" onClick={loadSeed}>
-                Load QX sessions
+          <button className="btn-primary" onClick={() => setGroupModal("add")}>
+            <FolderPlus size={15} /> New group
+          </button>
+        }
+      />
+
+      {/* Group switcher */}
+      {groups.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {groups.map((g) => {
+            const active = g.id === activeGroup?.id;
+            const { balance } = computeGroup(g, sessions);
+            return (
+              <button
+                key={g.id}
+                onClick={() => {
+                  setActiveGroupId(g.id);
+                  setSelectedSessionId(null);
+                }}
+                className={`chip border ${
+                  active ? "border-brand bg-brand/15 text-brand" : "border-border text-muted hover:bg-panel2"
+                }`}
+              >
+                {g.name}
+                <span className="tabular-nums">· {fmtMoney(balance, cur)}</span>
               </button>
+            );
+          })}
+        </div>
+      )}
+
+      {activeGroup && gstats && (
+        <>
+          {/* Goal banner — the primary objective */}
+          <div className="card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold">{activeGroup.name}</h3>
+                  <span className="text-xs text-muted">since {activeGroup.createdAt}</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-3xl font-semibold tabular-nums">
+                    {fmtMoney(gstats.balance, cur)}
+                  </span>
+                  <span className="text-sm text-muted">
+                    / goal {fmtMoney(gstats.goal, cur)}
+                  </span>
+                </div>
+                <div className="text-xs text-muted mt-1 flex items-center gap-1.5">
+                  <Target size={13} /> Start {fmtMoney(gstats.startCapital, cur)} → Goal{" "}
+                  {fmtMoney(gstats.goal, cur)}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button className="btn-ghost" onClick={() => setTxnModal("DEPOSIT")}>
+                  <ArrowDownToLine size={15} /> Deposit
+                </button>
+                <button className="btn-ghost" onClick={() => setTxnModal("WITHDRAW")}>
+                  <ArrowUpFromLine size={15} /> Withdraw
+                </button>
+                <button
+                  className="p-2 text-muted hover:text-text rounded hover:bg-panel2"
+                  onClick={() => setGroupModal("edit")}
+                  title="Edit group"
+                >
+                  <Pencil size={15} />
+                </button>
+                <button
+                  className="p-2 text-muted hover:text-loss rounded hover:bg-panel2"
+                  title="Delete group"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Delete ${activeGroup.name} and its ${gstats.sessions} session(s)? This cannot be undone.`
+                      )
+                    ) {
+                      deleteGroup(activeGroup.id);
+                      setActiveGroupId(null);
+                      setSelectedSessionId(null);
+                    }
+                  }}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Progress to goal */}
+            <div className="mt-4">
+              <div className="h-2.5 rounded-full bg-panel2 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-brand transition-all"
+                  style={{ width: `${Math.min(100, Math.max(0, gstats.progress))}%` }}
+                />
+              </div>
+              <div className="text-xs text-muted mt-1">{fmtPct(gstats.progress)} of goal reached</div>
+            </div>
+
+            {/* Cash-flow stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <Stat label="Deposited" value={fmtMoney(gstats.deposited, cur)} />
+              <Stat label="Withdrawn" value={fmtMoney(gstats.withdrawn, cur)} />
+              <Stat
+                label="Trading P&L"
+                value={`${gstats.sessionsNet >= 0 ? "+" : ""}${fmtMoney(gstats.sessionsNet, cur)}`}
+                tone={gstats.sessionsNet >= 0 ? "win" : "loss"}
+                hint={`${gstats.sessions} session${gstats.sessions === 1 ? "" : "s"}`}
+              />
+              <Stat
+                label="Balance"
+                value={fmtMoney(gstats.balance, cur)}
+                tone={gstats.balance >= gstats.startCapital ? "win" : "loss"}
+              />
+            </div>
+
+            {activeGroup.txns.length > 0 && (
+              <CashFlow group={activeGroup} currency={cur} />
             )}
+          </div>
+
+          {/* Sessions */}
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-muted">Sessions in {activeGroup.name}</h4>
             <button
-              className="btn-primary"
+              className="btn-ghost"
               onClick={() => {
                 setSessionModal("add");
               }}
@@ -63,98 +242,154 @@ function Journal() {
               <Plus size={15} /> New session
             </button>
           </div>
-        }
-      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat
-          label="Total P&L"
-          value={`${summary.net >= 0 ? "+" : ""}${fmtMoney(summary.net, cur)}`}
-          tone={summary.net >= 0 ? "win" : "loss"}
-          hint={`${summary.winners}W · ${summary.losers}L sessions`}
-        />
-        <Stat label="Sessions" value={summary.count} />
-        <Stat
-          label="Total invested"
-          value={fmtMoney(summary.invested, cur)}
-          hint={`Returned ${fmtMoney(summary.returned, cur)}`}
-        />
-        <Stat
-          label="Best / worst"
-          value={`${fmtMoney(summary.bestNet, cur)}`}
-          tone="win"
-          hint={`Worst ${fmtMoney(summary.worstNet, cur)}`}
-        />
-      </div>
-
-      {!sessions.length ? (
-        <div className="card p-10 text-center">
-          <p className="text-text font-medium">No sessions yet</p>
-          <p className="text-sm text-muted mt-1">
-            Create a session to start tracking a bankroll, or load your QX sessions to explore.
-          </p>
-          <div className="flex gap-2 justify-center mt-4">
-            <button className="btn-primary" onClick={() => setSessionModal("add")}>
-              <Plus size={15} /> New session
-            </button>
-            <button className="btn-ghost" onClick={loadSeed}>
-              Load QX sessions
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-[260px_1fr] gap-4">
-          <SessionList
-            sessions={ordered}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelectedId}
-            currency={cur}
-            total={summary.net}
-          />
-          {selected && (
-            <SessionDetail
-              key={selected.id}
-              session={selected}
-              currency={cur}
-              onEdit={() => {
-                setSelectedId(selected.id);
-                setSessionModal("edit");
-              }}
-              onDelete={() => {
-                if (confirm(`Delete session ${selected.name}?`)) {
-                  deleteSession(selected.id);
-                  setSelectedId(null);
-                }
-              }}
-            />
+          {groupSessions.length === 0 ? (
+            <div className="card p-10 text-center text-muted">
+              No sessions in this group yet — add the first one.
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-[260px_1fr] gap-4">
+              <SessionList
+                sessions={groupSessions}
+                selectedId={selectedSession?.id ?? null}
+                onSelect={setSelectedSessionId}
+                currency={cur}
+                total={gstats.sessionsNet}
+              />
+              {selectedSession && (
+                <SessionDetail
+                  key={selectedSession.id}
+                  session={selectedSession}
+                  currency={cur}
+                  onEdit={() => {
+                    setSelectedSessionId(selectedSession.id);
+                    setSessionModal("edit");
+                  }}
+                  onDelete={() => {
+                    if (confirm(`Delete session ${selectedSession.name}?`)) {
+                      deleteSession(selectedSession.id);
+                      setSelectedSessionId(null);
+                    }
+                  }}
+                />
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
+      {/* Group modal */}
+      <Modal
+        open={groupModal !== null}
+        onClose={() => setGroupModal(null)}
+        title={groupModal === "edit" ? "Edit group" : "New group"}
+      >
+        {groupModal === "edit" && activeGroup ? (
+          <GroupEditForm
+            group={activeGroup}
+            onCancel={() => setGroupModal(null)}
+            onSave={(patch) => {
+              updateGroup(activeGroup.id, patch);
+              setGroupModal(null);
+            }}
+          />
+        ) : (
+          <GroupForm
+            groups={groups}
+            currency={cur}
+            onCancel={() => setGroupModal(null)}
+            onCreate={(data, fundFrom) => {
+              const id = addGroup(data, fundFrom);
+              setActiveGroupId(id);
+              setSelectedSessionId(null);
+              setGroupModal(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Deposit / Withdraw modal */}
+      <Modal
+        open={txnModal !== null}
+        onClose={() => setTxnModal(null)}
+        title={txnModal === "WITHDRAW" ? "Withdraw" : "Deposit"}
+      >
+        {txnModal && activeGroup && gstats && (
+          <TxnForm
+            type={txnModal}
+            balance={gstats.balance}
+            currency={cur}
+            onCancel={() => setTxnModal(null)}
+            onSubmit={(t) => {
+              addTxn(activeGroup.id, t);
+              setTxnModal(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Session modal */}
       <Modal
         open={sessionModal !== null}
         onClose={() => setSessionModal(null)}
         title={sessionModal === "edit" ? "Edit session" : "New session"}
       >
-        <SessionForm
-          initial={sessionModal === "edit" ? selected ?? undefined : undefined}
-          onCancel={() => setSessionModal(null)}
-          onSubmit={(data) => {
-            if (sessionModal === "edit" && selected) {
-              updateSession(selected.id, data);
-            } else {
-              const id = addSession(data);
-              setSelectedId(id);
-            }
-            setSessionModal(null);
-          }}
-        />
+        {activeGroup && (
+          <SessionForm
+            initial={sessionModal === "edit" ? selectedSession ?? undefined : undefined}
+            suggestedName={`S${groupSessions.length + 1}`}
+            onCancel={() => setSessionModal(null)}
+            onSubmit={(data) => {
+              if (sessionModal === "edit" && selectedSession) {
+                updateSession(selectedSession.id, data);
+              } else {
+                const id = addSession({ ...data, groupId: activeGroup.id });
+                setSelectedSessionId(id);
+              }
+              setSessionModal(null);
+            }}
+          />
+        )}
       </Modal>
     </div>
   );
 }
 
-/** Left pane — the "Sessions" overview sheet: every session + grand total. */
+/** Compact deposit/withdrawal ledger for a group. */
+function CashFlow({ group, currency }: { group: Group; currency: string }) {
+  const deleteTxn = useStore((s) => s.deleteTxn);
+  return (
+    <div className="mt-4 border-t border-border pt-3">
+      <div className="text-xs text-muted mb-2">Cash flow</div>
+      <div className="space-y-1">
+        {[...group.txns]
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map((t) => (
+            <div key={t.id} className="flex items-center justify-between text-sm group/txn">
+              <span className="text-muted text-xs">
+                {t.date} · {t.note || (t.type === "DEPOSIT" ? "Deposit" : "Withdraw")}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className={`tabular-nums ${t.type === "DEPOSIT" ? "text-win" : "text-loss"}`}>
+                  {t.type === "DEPOSIT" ? "+" : "−"}
+                  {fmtMoney(t.amount, currency)}
+                </span>
+                <button
+                  className="opacity-0 group-hover/txn:opacity-100 p-1 text-muted hover:text-loss rounded"
+                  onClick={() => deleteTxn(group.id, t.id)}
+                  title="Remove"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/** Left pane — the sessions overview, scoped to the active group. */
 function SessionList({
   sessions,
   selectedId,
@@ -202,7 +437,7 @@ function SessionList({
         })}
       </div>
       <div className="px-4 py-3 border-t border-border flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wide text-muted">Total P&L</span>
+        <span className="text-xs uppercase tracking-wide text-muted">Trading P&L</span>
         <span
           className={`text-sm tabular-nums font-semibold ${
             total > 0 ? "text-win" : total < 0 ? "text-loss" : "text-muted"
@@ -216,7 +451,7 @@ function SessionList({
   );
 }
 
-/** Right pane — a single session sheet: capital, plan, entries, net. */
+/** Right pane — a single session: capital, plan, entries, net. */
 function SessionDetail({
   session,
   currency,
@@ -248,7 +483,6 @@ function SessionDetail({
 
   return (
     <div className="card overflow-hidden">
-      {/* Capital banner (merged A1 in the sheet) */}
       <div className="px-5 py-4 border-b border-border bg-panel2/40 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -270,7 +504,6 @@ function SessionDetail({
         </div>
       </div>
 
-      {/* Plan strip — base size = capital / steps */}
       <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted">
           Plan · base size <span className="text-text font-medium">{fmtMoney(stats.baseSize, currency)}</span>{" "}
@@ -285,7 +518,6 @@ function SessionDetail({
         </div>
       </div>
 
-      {/* Entries table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -309,14 +541,8 @@ function SessionDetail({
                     {fmtMoney(e.payout, currency)}
                   </td>
                   <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => cycleOutcome(e)}
-                      title="Click to change result"
-                      className="cursor-pointer"
-                    >
-                      <Badge
-                        tone={e.outcome === "WIN" ? "win" : e.outcome === "LOSS" ? "loss" : "default"}
-                      >
+                    <button onClick={() => cycleOutcome(e)} title="Click to change result" className="cursor-pointer">
+                      <Badge tone={e.outcome === "WIN" ? "win" : e.outcome === "LOSS" ? "loss" : "default"}>
                         {e.outcome === "PENDING" ? "OPEN" : e.outcome}
                       </Badge>
                     </button>
@@ -367,8 +593,7 @@ function SessionDetail({
                   {fmtMoney(stats.returned, currency)}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-muted">
-                  {stats.wins}W · {stats.losses}L
-                  {stats.pending ? ` · ${stats.pending} open` : ""}
+                  {stats.wins}W · {stats.losses}L{stats.pending ? ` · ${stats.pending} open` : ""}
                 </td>
                 <td
                   className={`px-4 py-2.5 text-right tabular-nums ${
@@ -385,7 +610,6 @@ function SessionDetail({
         </table>
       </div>
 
-      {/* Footer: net + ROI + add step */}
       <div className="px-5 py-3 border-t border-border flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4 text-xs text-muted">
           <span>
@@ -439,16 +663,196 @@ function SessionDetail({
 
 // ---- Forms ----
 
+type SessionFormData = Omit<Session, "id" | "entries" | "groupId">;
+
+function GroupForm({
+  groups,
+  currency,
+  onCreate,
+  onCancel,
+}: {
+  groups: Group[];
+  currency: string;
+  onCreate: (
+    data: { name: string; goal: number; notes: string; deposit: number },
+    fundFromGroupId?: string
+  ) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(`Group ${groups.length + 1}`);
+  const [deposit, setDeposit] = useState(DEFAULT_DEPOSIT);
+  const [goal, setGoal] = useState(DEFAULT_GOAL);
+  const [fundFrom, setFundFrom] = useState("");
+  const [notes, setNotes] = useState("");
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onCreate(
+          { name: name.trim() || `Group ${groups.length + 1}`, goal: Number(goal) || 0, notes, deposit: Number(deposit) || 0 },
+          fundFrom || undefined
+        );
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Group name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Goal">
+          <Input type="number" step="any" value={goal} onChange={(e) => setGoal(e.target.valueAsNumber)} />
+        </Field>
+        <Field label="Starting deposit">
+          <Input type="number" step="any" value={deposit} onChange={(e) => setDeposit(e.target.valueAsNumber)} />
+        </Field>
+        <Field label="Fund from (optional)">
+          <Select
+            value={fundFrom}
+            onChange={(e) => setFundFrom(e.target.value)}
+            options={[
+              { value: "", label: "New money" },
+              ...groups.map((g) => ({ value: g.id, label: `Withdraw from ${g.name}` })),
+            ]}
+          />
+        </Field>
+      </div>
+      {fundFrom && (
+        <div className="text-xs text-muted -mt-1">
+          {fmtMoney(Number(deposit) || 0, currency)} will be withdrawn from the selected group and
+          deposited here.
+        </div>
+      )}
+      <Field label="Notes">
+        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Plan for this run…" />
+      </Field>
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" className="btn-ghost" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" className="btn-primary">
+          Create group
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function GroupEditForm({
+  group,
+  onSave,
+  onCancel,
+}: {
+  group: Group;
+  onSave: (patch: { name: string; goal: number; notes: string }) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(group.name);
+  const [goal, setGoal] = useState(group.goal);
+  const [notes, setNotes] = useState(group.notes);
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({ name: name.trim() || group.name, goal: Number(goal) || 0, notes });
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Group name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Goal">
+          <Input type="number" step="any" value={goal} onChange={(e) => setGoal(e.target.valueAsNumber)} />
+        </Field>
+      </div>
+      <Field label="Notes">
+        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </Field>
+      <p className="text-xs text-muted -mt-1">
+        To change funds, use the Deposit / Withdraw buttons — they keep the cash-flow history accurate.
+      </p>
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" className="btn-ghost" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" className="btn-primary">
+          Save
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function TxnForm({
+  type,
+  balance,
+  currency,
+  onSubmit,
+  onCancel,
+}: {
+  type: "DEPOSIT" | "WITHDRAW";
+  balance: number;
+  currency: string;
+  onSubmit: (t: { date: string; type: "DEPOSIT" | "WITHDRAW"; amount: number; note?: string }) => void;
+  onCancel: () => void;
+}) {
+  const [amount, setAmount] = useState(type === "WITHDRAW" ? 0 : DEFAULT_DEPOSIT);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState("");
+
+  const over = type === "WITHDRAW" && amount > balance;
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({ date, type, amount: Math.abs(Number(amount) || 0), note: note.trim() || undefined });
+      }}
+    >
+      {type === "WITHDRAW" && (
+        <div className="text-sm text-muted">
+          Available balance: <span className="text-text font-medium">{fmtMoney(balance, currency)}</span>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Amount">
+          <Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.valueAsNumber)} autoFocus />
+        </Field>
+        <Field label="Date">
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+      </div>
+      <Field label="Note (optional)">
+        <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={type === "WITHDRAW" ? "Profit taking…" : "Top-up…"} />
+      </Field>
+      {over && <div className="text-xs text-loss">Withdrawing more than the current balance.</div>}
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" className="btn-ghost" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" className="btn-primary">
+          {type === "WITHDRAW" ? "Withdraw" : "Deposit"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function SessionForm({
   initial,
+  suggestedName,
   onSubmit,
   onCancel,
 }: {
   initial?: Session;
-  onSubmit: (d: Omit<Session, "id" | "entries">) => void;
+  suggestedName: string;
+  onSubmit: (d: SessionFormData) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(initial?.name ?? "");
+  const [name, setName] = useState(initial?.name ?? suggestedName);
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [capital, setCapital] = useState(initial?.capital ?? 500);
   const [steps, setSteps] = useState(initial?.steps ?? 5);
@@ -470,20 +874,10 @@ function SessionForm({
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Field label="Capital (bankroll)">
-          <Input
-            type="number"
-            step="any"
-            value={capital}
-            onChange={(e) => setCapital(e.target.valueAsNumber)}
-          />
+          <Input type="number" step="any" value={capital} onChange={(e) => setCapital(e.target.valueAsNumber)} />
         </Field>
         <Field label="Plan steps">
-          <Input
-            type="number"
-            min={1}
-            value={steps}
-            onChange={(e) => setSteps(e.target.valueAsNumber)}
-          />
+          <Input type="number" min={1} value={steps} onChange={(e) => setSteps(e.target.valueAsNumber)} />
         </Field>
       </div>
       <div className="text-xs text-muted -mt-1">
@@ -517,9 +911,7 @@ function EntryForm({
   onSubmit: (d: Omit<SessionEntry, "id">) => void;
   onCancel: () => void;
 }) {
-  const [investment, setInvestment] = useState(
-    initial?.investment ?? Math.round(suggestedInvestment)
-  );
+  const [investment, setInvestment] = useState(initial?.investment ?? Math.round(suggestedInvestment));
   const [payout, setPayout] = useState(
     initial?.payout ?? Math.round((suggestedInvestment || 0) * (1 + (payoutPct ?? 85) / 100))
   );
@@ -532,30 +924,15 @@ function EntryForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({
-          investment: Number(investment) || 0,
-          payout: Number(payout) || 0,
-          outcome,
-        });
+        onSubmit({ investment: Number(investment) || 0, payout: Number(payout) || 0, outcome });
       }}
     >
       <div className="grid grid-cols-2 gap-3">
         <Field label="Investment (stake)">
-          <Input
-            type="number"
-            step="any"
-            value={investment}
-            onChange={(e) => setInvestment(e.target.valueAsNumber)}
-            autoFocus
-          />
+          <Input type="number" step="any" value={investment} onChange={(e) => setInvestment(e.target.valueAsNumber)} autoFocus />
         </Field>
         <Field label="Expected return (payout)">
-          <Input
-            type="number"
-            step="any"
-            value={payout}
-            onChange={(e) => setPayout(e.target.valueAsNumber)}
-          />
+          <Input type="number" step="any" value={payout} onChange={(e) => setPayout(e.target.valueAsNumber)} />
         </Field>
       </div>
       <Field label="Result">

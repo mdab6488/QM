@@ -1,18 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  BookOpenText,
+  Wallet,
   Brain,
   Newspaper,
   Settings,
   CandlestickChart,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { stopPersistence } from "@/lib/persistence";
+import { useStore } from "@/lib/store";
+
+function useSignOut() {
+  const router = useRouter();
+  return async () => {
+    try {
+      await getSupabaseClient().auth.signOut();
+    } catch {
+      // ignore — we clear local state regardless
+    }
+    stopPersistence();
+    useStore.getState().reset();
+    router.replace("/login");
+  };
+}
 
 const NAV = [
-  { href: "/trades", label: "Trade Journal", icon: BookOpenText },
+  { href: "/trades", label: "Money Management", icon: Wallet },
   { href: "/psychology", label: "Psychology", icon: Brain },
   { href: "/news", label: "News & Calendar", icon: Newspaper },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -20,6 +38,7 @@ const NAV = [
 
 export function Sidebar() {
   const path = usePathname();
+  const signOut = useSignOut();
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-panel/50 p-4">
       <div className="flex items-center gap-2 px-2 py-3 mb-4">
@@ -48,8 +67,16 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="mt-auto px-2 pt-4 text-[11px] text-muted">
-        Local-first · your data stays in your browser
+      <div className="mt-auto pt-4">
+        <button
+          onClick={signOut}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel2 hover:text-text transition-colors"
+        >
+          <LogOut size={18} /> Sign out
+        </button>
+        <div className="px-2 pt-3 text-[11px] text-muted">
+          Synced to your account · Supabase
+        </div>
       </div>
     </aside>
   );

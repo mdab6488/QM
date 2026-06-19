@@ -1,4 +1,4 @@
-import { NEGATIVE_EMOTIONS, Session, SessionEntry, Trade } from "./types";
+import { Group, NEGATIVE_EMOTIONS, Session, SessionEntry, Trade } from "./types";
 
 export interface KPIs {
   totalTrades: number;
@@ -265,6 +265,42 @@ export function summarizeSessions(sessions: Session[]): SessionsSummary {
     losers: nets.filter((n) => n < 0).length,
     bestNet: nets.length ? Math.max(...nets) : 0,
     worstNet: nets.length ? Math.min(...nets) : 0,
+  };
+}
+
+// ---- group (run toward a goal) math ----
+
+export interface GroupStats {
+  deposited: number;    // total paid in (initial + top-ups + transfers in)
+  withdrawn: number;    // total taken out (cash-outs + transfers to other groups)
+  sessionsNet: number;  // trading P&L from this group's sessions
+  balance: number;      // deposited - withdrawn + sessionsNet (cash on the table)
+  goal: number;
+  progress: number;     // balance / goal * 100, clamped to >= 0
+  sessions: number;
+  startCapital: number; // first deposit, for reference
+}
+
+export function computeGroup(group: Group, allSessions: Session[]): GroupStats {
+  const mine = allSessions.filter((s) => s.groupId === group.id);
+  const sessionsNet = round2(sum(mine.map((s) => computeSession(s).net)));
+  const deposited = round2(
+    sum(group.txns.filter((t) => t.type === "DEPOSIT").map((t) => t.amount))
+  );
+  const withdrawn = round2(
+    sum(group.txns.filter((t) => t.type === "WITHDRAW").map((t) => t.amount))
+  );
+  const balance = round2(deposited - withdrawn + sessionsNet);
+  const firstDeposit = group.txns.find((t) => t.type === "DEPOSIT");
+  return {
+    deposited,
+    withdrawn,
+    sessionsNet,
+    balance,
+    goal: group.goal,
+    progress: group.goal > 0 ? round2(Math.max(0, (balance / group.goal) * 100)) : 0,
+    sessions: mine.length,
+    startCapital: firstDeposit?.amount ?? 0,
   };
 }
 

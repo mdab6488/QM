@@ -41,6 +41,29 @@ export interface Trade {
   session?: string;    // optional grouping (e.g. "S1") for legacy import
 }
 
+/** A deposit into, or withdrawal out of, a group's account. */
+export interface GroupTxn {
+  id: string;
+  date: string;                  // ISO date
+  type: "DEPOSIT" | "WITHDRAW";
+  amount: number;                // always positive
+  note?: string;                 // e.g. "Initial deposit", "Transfer to Group 2"
+}
+
+/**
+ * A group is one funded "run": you deposit a starting amount (e.g. $250) and
+ * trade sessions toward a goal (e.g. $30,000). When a group does well you can
+ * withdraw from it — including to seed a fresh group. Sessions belong to a group.
+ */
+export interface Group {
+  id: string;
+  name: string;                  // e.g. "Group 1"
+  goal: number;                  // target balance for this run
+  notes: string;
+  createdAt: string;             // ISO date
+  txns: GroupTxn[];              // deposits & withdrawals
+}
+
 export type SessionOutcome = "WIN" | "LOSS" | "PENDING";
 
 /**
@@ -62,6 +85,7 @@ export interface SessionEntry {
  */
 export interface Session {
   id: string;
+  groupId: string;      // owning group
   name: string;         // e.g. "S1", "S2"
   date: string;         // ISO date
   capital: number;      // session bankroll
@@ -101,6 +125,7 @@ export interface Settings {
 
 export interface AppState {
   trades: Trade[];
+  groups: Group[];
   sessions: Session[];
   moods: MoodLog[];
   rules: TradingRule[];
