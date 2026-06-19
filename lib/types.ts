@@ -41,6 +41,35 @@ export interface Trade {
   session?: string;    // optional grouping (e.g. "S1") for legacy import
 }
 
+export type SessionOutcome = "WIN" | "LOSS" | "PENDING";
+
+/**
+ * A single step inside a session — one trade in the money-management ladder.
+ * `payout` is the return received if this step wins (the broker payout), so the
+ * step profit is `(outcome === "WIN" ? payout : 0) - investment`.
+ */
+export interface SessionEntry {
+  id: string;
+  investment: number;   // stake deployed on this step
+  payout: number;       // expected return if this step wins
+  outcome: SessionOutcome;
+  note?: string;
+}
+
+/**
+ * A trading session: a fixed bankroll worked through a planned ladder of steps,
+ * mirroring the QX session sheets (capital → capital/steps plan → entries → net).
+ */
+export interface Session {
+  id: string;
+  name: string;         // e.g. "S1", "S2"
+  date: string;         // ISO date
+  capital: number;      // session bankroll
+  steps: number;        // planned ladder steps (default 5)
+  notes: string;
+  entries: SessionEntry[];
+}
+
 /** A daily psychology / wellbeing check-in, independent of individual trades. */
 export interface MoodLog {
   id: string;
@@ -72,6 +101,7 @@ export interface Settings {
 
 export interface AppState {
   trades: Trade[];
+  sessions: Session[];
   moods: MoodLog[];
   rules: TradingRule[];
   settings: Settings;

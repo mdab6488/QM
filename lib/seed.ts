@@ -1,4 +1,4 @@
-import { Trade, TradingRule } from "./types";
+import { Session, SessionEntry, Trade, TradingRule } from "./types";
 import { uid } from "./utils";
 
 /**
@@ -80,6 +80,149 @@ function splitInto(total: number, n: number): number[] {
     }
   }
   return [total];
+}
+
+/**
+ * Sessions transcribed from QX.xlsx (one sheet per session). Each tuple is
+ * [investment, payout, won] for one step. For winning steps the payout is the
+ * amount actually returned in the original sheet; losing steps return nothing.
+ * Net per session = sum(returned on wins) - sum(invested), matching the
+ * QX "Sessions" overview (S1 uses the five steps that fed its total).
+ */
+type Step = [investment: number, payout: number, won: boolean];
+
+const SESSION_DATA: { name: string; capital: number; steps: Step[] }[] = [
+  {
+    name: "S1",
+    capital: 603,
+    steps: [
+      [120, 225, false],
+      [120, 225, false],
+      [120, 225, false],
+      [57, 108, true],
+      [129, 245, true],
+    ],
+  },
+  {
+    name: "S2",
+    capital: 353,
+    steps: [
+      [23, 43, false],
+      [23, 43, false],
+      [46, 87, true],
+      [23, 42, false],
+      [46, 87, false],
+      [46, 84, true],
+      [46, 84, true],
+      [23, 43, false],
+      [23, 43, true],
+    ],
+  },
+  {
+    name: "S3",
+    capital: 400,
+    steps: [
+      [26, 49, true],
+      [26, 46, true],
+      [26, 49, false],
+      [80, 152, true],
+      [80, 146, true],
+      [80, 146, true],
+      [80, 146, false],
+    ],
+  },
+  {
+    name: "S4",
+    capital: 543,
+    steps: [
+      [80, 152, true],
+      [28, 53, true],
+      [108, 205, false],
+      [108, 205, false],
+      [108.6, 205, false],
+      [108.6, 205, true],
+    ],
+  },
+  {
+    name: "S5",
+    capital: 413,
+    steps: [
+      [82.6, 150, true],
+      [82.6, 153.34, false],
+      [82.6, 153.34, false],
+      [82.6, 153.34, false],
+      [82.6, 153.34, false],
+      [82.6, 150, true],
+      [71, 71, true],
+      [150, 274, true],
+    ],
+  },
+  {
+    name: "S6",
+    capital: 346,
+    steps: [
+      [69, 129, false],
+      [69, 126, true],
+      [69, 129, false],
+      [69, 129, true],
+      [69, 126, true],
+      [128, 234, true],
+    ],
+  },
+  {
+    name: "S7",
+    capital: 489,
+    steps: [
+      [97, 175, false],
+      [97, 175, true],
+      [97, 175, false],
+      [97, 177, true],
+      [97, 177, true],
+      [97, 177, true],
+      [97, 177, false],
+      [97, 177, true],
+    ],
+  },
+  {
+    name: "S8",
+    capital: 518,
+    steps: [
+      [103, 193, true],
+      [103, 189, true],
+      [103, 189, true],
+      [103, 189, false],
+      [103, 190, true],
+      [103, 189, false],
+      [103, 189, false],
+      [103, 189, false],
+      [103, 189, false],
+    ],
+  },
+];
+
+export function seedSessions(): Session[] {
+  const base = new Date();
+  base.setDate(base.getDate() - SESSION_DATA.length);
+
+  return SESSION_DATA.map((s, si) => {
+    const day = new Date(base);
+    day.setDate(base.getDate() + si + 1);
+    const entries: SessionEntry[] = s.steps.map(([investment, payout, won]) => ({
+      id: uid(),
+      investment,
+      payout,
+      outcome: won ? "WIN" : "LOSS",
+    }));
+    return {
+      id: uid(),
+      name: s.name,
+      date: day.toISOString().slice(0, 10),
+      capital: s.capital,
+      steps: 5,
+      notes: "",
+      entries,
+    };
+  });
 }
 
 export function seedRules(): TradingRule[] {

@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   BookOpenText,
-  BarChart3,
   Brain,
   Newspaper,
   Settings,
@@ -14,9 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/trades", label: "Trade Journal", icon: BookOpenText },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/psychology", label: "Psychology", icon: Brain },
   { href: "/news", label: "News & Calendar", icon: Newspaper },
   { href: "/settings", label: "Settings", icon: Settings },

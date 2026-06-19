@@ -2,9 +2,9 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AppState, MoodLog, Settings, Trade, TradingRule } from "./types";
+import { AppState, MoodLog, Session, SessionEntry, Settings, Trade, TradingRule } from "./types";
 import { uid } from "./utils";
-import { seedTrades, seedRules } from "./seed";
+import { seedTrades, seedRules, seedSessions } from "./seed";
 
 const DEFAULT_SETTINGS: Settings = {
   traderName: "Trader",
@@ -22,6 +22,13 @@ interface StoreActions {
   deleteTrade: (id: string) => void;
   importTrades: (rows: Omit<Trade, "id">[]) => void;
   clearTrades: () => void;
+
+  addSession: (s: Omit<Session, "id" | "entries">) => string;
+  updateSession: (id: string, patch: Partial<Omit<Session, "id" | "entries">>) => void;
+  deleteSession: (id: string) => void;
+  addEntry: (sessionId: string, e: Omit<SessionEntry, "id">) => void;
+  updateEntry: (sessionId: string, entryId: string, patch: Partial<SessionEntry>) => void;
+  deleteEntry: (sessionId: string, entryId: string) => void;
 
   addMood: (m: Omit<MoodLog, "id">) => void;
   deleteMood: (id: string) => void;
@@ -44,6 +51,7 @@ export const useStore = create<Store>()(
   persist(
     (set) => ({
       trades: [],
+      sessions: [],
       moods: [],
       rules: [],
       settings: DEFAULT_SETTINGS,
@@ -59,6 +67,45 @@ export const useStore = create<Store>()(
       importTrades: (rows) =>
         set((s) => ({ trades: [...s.trades, ...rows.map((r) => ({ ...r, id: uid() }))] })),
       clearTrades: () => set({ trades: [] }),
+
+      addSession: (s) => {
+        const id = uid();
+        set((st) => ({ sessions: [...st.sessions, { ...s, id, entries: [] }] }));
+        return id;
+      },
+      updateSession: (id, patch) =>
+        set((st) => ({
+          sessions: st.sessions.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+        })),
+      deleteSession: (id) =>
+        set((st) => ({ sessions: st.sessions.filter((x) => x.id !== id) })),
+      addEntry: (sessionId, e) =>
+        set((st) => ({
+          sessions: st.sessions.map((x) =>
+            x.id === sessionId ? { ...x, entries: [...x.entries, { ...e, id: uid() }] } : x
+          ),
+        })),
+      updateEntry: (sessionId, entryId, patch) =>
+        set((st) => ({
+          sessions: st.sessions.map((x) =>
+            x.id === sessionId
+              ? {
+                  ...x,
+                  entries: x.entries.map((en) =>
+                    en.id === entryId ? { ...en, ...patch } : en
+                  ),
+                }
+              : x
+          ),
+        })),
+      deleteEntry: (sessionId, entryId) =>
+        set((st) => ({
+          sessions: st.sessions.map((x) =>
+            x.id === sessionId
+              ? { ...x, entries: x.entries.filter((en) => en.id !== entryId) }
+              : x
+          ),
+        })),
 
       addMood: (m) => set((s) => ({ moods: [...s.moods, { ...m, id: uid() }] })),
       deleteMood: (id) => set((s) => ({ moods: s.moods.filter((x) => x.id !== id) })),
@@ -76,14 +123,20 @@ export const useStore = create<Store>()(
       loadSeed: () =>
         set((s) => ({
           trades: s.trades.length ? s.trades : seedTrades(),
+          sessions: s.sessions.length ? s.sessions : seedSessions(),
           rules: s.rules.length ? s.rules : seedRules(),
         })),
       resetAll: () =>
-        set({ trades: [], moods: [], rules: [], settings: DEFAULT_SETTINGS }),
+        set({ trades: [], sessions: [], moods: [], rules: [], settings: DEFAULT_SETTINGS }),
     }),
     {
       name: "qm-trading-cockpit",
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Partial<AppState>;
+        if (version < 2 && !state.sessions) state.sessions = [];
+        return state as AppState;
+      },
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     }
   )

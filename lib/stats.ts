@@ -1,4 +1,4 @@
-import { NEGATIVE_EMOTIONS, Trade } from "./types";
+import { NEGATIVE_EMOTIONS, Session, SessionEntry, Trade } from "./types";
 
 export interface KPIs {
   totalTrades: number;
@@ -194,6 +194,78 @@ export function byDay(trades: Trade[]): DailyStat[] {
       wins: list.filter((x) => x.outcome === "WIN").length,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ---- session (money-management) math ----
+
+/** Amount returned by a step: the payout if it won, otherwise nothing. */
+export function entryReturn(e: SessionEntry): number {
+  return e.outcome === "WIN" ? e.payout : 0;
+}
+
+/** Net profit/loss of a single step. */
+export function entryPnl(e: SessionEntry): number {
+  return round2(entryReturn(e) - e.investment);
+}
+
+export interface SessionStats {
+  invested: number;     // total deployed across decided + pending steps
+  returned: number;     // total returned by winning steps
+  net: number;          // returned - invested
+  roi: number;          // net / invested * 100
+  baseSize: number;     // capital / steps (planned per-step stake)
+  entries: number;
+  wins: number;
+  losses: number;
+  pending: number;
+  winRate: number;      // % of decided steps that won
+}
+
+export function computeSession(s: Session): SessionStats {
+  const decided = s.entries.filter((e) => e.outcome !== "PENDING");
+  const wins = s.entries.filter((e) => e.outcome === "WIN").length;
+  const losses = s.entries.filter((e) => e.outcome === "LOSS").length;
+  const pending = s.entries.filter((e) => e.outcome === "PENDING").length;
+  const invested = round2(sum(s.entries.map((e) => e.investment)));
+  const returned = round2(sum(s.entries.map(entryReturn)));
+  const net = round2(returned - invested);
+  return {
+    invested,
+    returned,
+    net,
+    roi: invested ? round2((net / invested) * 100) : 0,
+    baseSize: s.steps ? round2(s.capital / s.steps) : 0,
+    entries: s.entries.length,
+    wins,
+    losses,
+    pending,
+    winRate: decided.length ? round2((wins / decided.length) * 100) : 0,
+  };
+}
+
+export interface SessionsSummary {
+  count: number;
+  net: number;          // grand total across sessions
+  invested: number;
+  returned: number;
+  winners: number;      // sessions that ended net positive
+  losers: number;
+  bestNet: number;
+  worstNet: number;
+}
+
+export function summarizeSessions(sessions: Session[]): SessionsSummary {
+  const nets = sessions.map((s) => computeSession(s).net);
+  return {
+    count: sessions.length,
+    net: round2(sum(nets)),
+    invested: round2(sum(sessions.map((s) => computeSession(s).invested))),
+    returned: round2(sum(sessions.map((s) => computeSession(s).returned))),
+    winners: nets.filter((n) => n > 0).length,
+    losers: nets.filter((n) => n < 0).length,
+    bestNet: nets.length ? Math.max(...nets) : 0,
+    worstNet: nets.length ? Math.min(...nets) : 0,
+  };
 }
 
 // ---- small math helpers ----
