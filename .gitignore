@@ -3,6 +3,7 @@
 /out
 /build
 *.tsbuildinfo
+COMMIT_MSG.txt
 .DS_Store
 *.pem
 npm-debug.log*
