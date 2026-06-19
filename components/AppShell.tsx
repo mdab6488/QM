@@ -36,6 +36,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         router.replace("/trades");
         return;
       }
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      useStore.getState().setAccount({
+        email: user.email ?? "",
+        name:
+          (meta.full_name as string) ||
+          (meta.name as string) ||
+          (user.email ? user.email.split("@")[0] : ""),
+        avatarUrl: (meta.avatar_url as string) || (meta.picture as string) || "",
+      });
       const state = await loadState(user.id);
       if (!active) return;
       useStore.getState().hydrate(state ?? {});

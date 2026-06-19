@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import {
+  Account,
   AppState,
   Group,
   GroupTxn,
@@ -64,6 +65,10 @@ interface StoreActions {
   /** Clear everything in memory (on sign-out). */
   reset: () => void;
   hydrated: boolean;
+
+  /** Signed-in user identity (not persisted to the data document). */
+  account: Account | null;
+  setAccount: (a: Account | null) => void;
 }
 
 export type Store = AppState & StoreActions;
@@ -76,6 +81,8 @@ export const useStore = create<Store>()((set) => ({
       rules: [],
       settings: DEFAULT_SETTINGS,
       hydrated: false,
+      account: null,
+      setAccount: (a) => set({ account: a }),
 
       addTrade: (t) => set((s) => ({ trades: [...s.trades, { ...t, id: uid() }] })),
       updateTrade: (id, patch) =>
@@ -228,5 +235,6 @@ export const useStore = create<Store>()((set) => ({
           rules: [],
           settings: DEFAULT_SETTINGS,
           hydrated: false,
+          account: null,
         }),
 }));

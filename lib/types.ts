@@ -41,6 +41,13 @@ export interface Trade {
   session?: string;    // optional grouping (e.g. "S1") for legacy import
 }
 
+/** The signed-in user's identity, read from the Google/Supabase session. */
+export interface Account {
+  email: string;
+  name: string;
+  avatarUrl: string;
+}
+
 /** A deposit into, or withdrawal out of, a group's account. */
 export interface GroupTxn {
   id: string;

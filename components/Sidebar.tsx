@@ -39,6 +39,7 @@ const NAV = [
 export function Sidebar() {
   const path = usePathname();
   const signOut = useSignOut();
+  const account = useStore((s) => s.account);
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-panel/50 p-4">
       <div className="flex items-center gap-2 px-2 py-3 mb-4">
@@ -68,15 +69,35 @@ export function Sidebar() {
         })}
       </nav>
       <div className="mt-auto pt-4">
+        {account && (
+          <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
+            {account.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={account.avatarUrl}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-full shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-brand/20 text-brand grid place-items-center text-sm font-medium shrink-0">
+                {(account.name || account.email || "?").charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              {account.name && (
+                <div className="text-sm font-medium leading-tight truncate">{account.name}</div>
+              )}
+              <div className="text-[11px] text-muted leading-tight truncate">{account.email}</div>
+            </div>
+          </div>
+        )}
         <button
           onClick={signOut}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel2 hover:text-text transition-colors"
         >
           <LogOut size={18} /> Sign out
         </button>
-        <div className="px-2 pt-3 text-[11px] text-muted">
-          Synced to your account · Supabase
-        </div>
       </div>
     </aside>
   );
