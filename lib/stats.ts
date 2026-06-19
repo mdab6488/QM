@@ -281,6 +281,15 @@ export interface GroupStats {
   startCapital: number; // first deposit, for reference
 }
 
+/** Next sequential group name: one past the highest existing "Group N". */
+export function nextGroupName(groups: Group[]): string {
+  const max = groups.reduce((m, g) => {
+    const match = /^Group\s+(\d+)$/.exec(g.name.trim());
+    return match ? Math.max(m, parseInt(match[1], 10)) : m;
+  }, 0);
+  return `Group ${max + 1}`;
+}
+
 export function computeGroup(group: Group, allSessions: Session[]): GroupStats {
   const mine = allSessions.filter((s) => s.groupId === group.id);
   const sessionsNet = round2(sum(mine.map((s) => computeSession(s).net)));

@@ -6,7 +6,7 @@ import { Hydrated } from "@/components/Hydrated";
 import { Badge, Field, Input, Modal, SectionTitle, Select, Stat, Textarea } from "@/components/ui";
 import { Group, Session, SessionEntry, SessionOutcome } from "@/lib/types";
 import { fmtMoney, fmtPct } from "@/lib/utils";
-import { computeGroup, computeSession, entryPnl } from "@/lib/stats";
+import { computeGroup, computeSession, entryPnl, nextGroupName } from "@/lib/stats";
 import { DEFAULT_DEPOSIT, DEFAULT_GOAL } from "@/lib/constants";
 import {
   Plus,
@@ -90,6 +90,7 @@ function MoneyManagement() {
         <Modal open={groupModal !== null} onClose={() => setGroupModal(null)} title="New group">
           <GroupForm
             groups={groups}
+            nextName={nextGroupName(groups)}
             currency={cur}
             onCancel={() => setGroupModal(null)}
             onCreate={(data, fundFrom) => {
@@ -296,6 +297,7 @@ function MoneyManagement() {
         ) : (
           <GroupForm
             groups={groups}
+            nextName={nextGroupName(groups)}
             currency={cur}
             onCancel={() => setGroupModal(null)}
             onCreate={(data, fundFrom) => {
@@ -667,19 +669,20 @@ type SessionFormData = Omit<Session, "id" | "entries" | "groupId">;
 
 function GroupForm({
   groups,
+  nextName,
   currency,
   onCreate,
   onCancel,
 }: {
   groups: Group[];
+  nextName: string;
   currency: string;
   onCreate: (
-    data: { name: string; goal: number; notes: string; deposit: number },
+    data: { goal: number; notes: string; deposit: number },
     fundFromGroupId?: string
   ) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(`Group ${groups.length + 1}`);
   const [deposit, setDeposit] = useState(DEFAULT_DEPOSIT);
   const [goal, setGoal] = useState(DEFAULT_GOAL);
   const [fundFrom, setFundFrom] = useState("");
@@ -691,15 +694,17 @@ function GroupForm({
       onSubmit={(e) => {
         e.preventDefault();
         onCreate(
-          { name: name.trim() || `Group ${groups.length + 1}`, goal: Number(goal) || 0, notes, deposit: Number(deposit) || 0 },
+          { goal: Number(goal) || 0, notes, deposit: Number(deposit) || 0 },
           fundFrom || undefined
         );
       }}
     >
+      <div className="rounded-lg bg-panel2 px-3 py-2 text-sm">
+        <span className="text-muted">New group name: </span>
+        <span className="font-medium">{nextName}</span>
+        <span className="text-muted text-xs"> (auto-numbered)</span>
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Group name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
         <Field label="Goal">
           <Input type="number" step="any" value={goal} onChange={(e) => setGoal(e.target.valueAsNumber)} />
         </Field>
@@ -744,10 +749,9 @@ function GroupEditForm({
   onCancel,
 }: {
   group: Group;
-  onSave: (patch: { name: string; goal: number; notes: string }) => void;
+  onSave: (patch: { goal: number; notes: string }) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(group.name);
   const [goal, setGoal] = useState(group.goal);
   const [notes, setNotes] = useState(group.notes);
 
@@ -756,17 +760,17 @@ function GroupEditForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave({ name: name.trim() || group.name, goal: Number(goal) || 0, notes });
+        onSave({ goal: Number(goal) || 0, notes });
       }}
     >
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Group name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="Goal">
-          <Input type="number" step="any" value={goal} onChange={(e) => setGoal(e.target.valueAsNumber)} />
-        </Field>
+      <div className="rounded-lg bg-panel2 px-3 py-2 text-sm">
+        <span className="text-muted">Group: </span>
+        <span className="font-medium">{group.name}</span>
+        <span className="text-muted text-xs"> (auto-numbered, not editable)</span>
       </div>
+      <Field label="Goal">
+        <Input type="number" step="any" value={goal} onChange={(e) => setGoal(e.target.valueAsNumber)} />
+      </Field>
       <Field label="Notes">
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>

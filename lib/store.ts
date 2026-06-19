@@ -13,6 +13,7 @@ import {
   TradingRule,
 } from "./types";
 import { uid } from "./utils";
+import { nextGroupName } from "./stats";
 
 const DEFAULT_SETTINGS: Settings = {
   traderName: "Trader",
@@ -31,9 +32,10 @@ interface StoreActions {
   importTrades: (rows: Omit<Trade, "id">[]) => void;
   clearTrades: () => void;
 
-  /** Create a group. If `fundFromGroupId` is set, that group is withdrawn the
-   *  deposit amount (a transfer) and the new group is credited it. */
-  addGroup: (g: { name: string; goal: number; notes?: string; deposit: number }, fundFromGroupId?: string) => string;
+  /** Create a group. The name is auto-generated in sequence (Group 1, 2, …).
+   *  If `fundFromGroupId` is set, that group is withdrawn the deposit amount
+   *  (a transfer) and the new group is credited it. */
+  addGroup: (g: { goal: number; notes?: string; deposit: number }, fundFromGroupId?: string) => string;
   updateGroup: (id: string, patch: Partial<Pick<Group, "name" | "goal" | "notes">>) => void;
   deleteGroup: (id: string) => void;
   addTxn: (groupId: string, t: Omit<GroupTxn, "id">) => void;
@@ -87,9 +89,10 @@ export const useStore = create<Store>()((set) => ({
         const id = uid();
         const today = new Date().toISOString().slice(0, 10);
         set((st) => {
+          const name = nextGroupName(st.groups);
           const newGroup: Group = {
             id,
-            name: g.name,
+            name,
             goal: g.goal,
             notes: g.notes ?? "",
             createdAt: today,
@@ -115,7 +118,7 @@ export const useStore = create<Store>()((set) => ({
                       date: today,
                       type: "WITHDRAW" as const,
                       amount: g.deposit,
-                      note: `Transfer to ${g.name}`,
+                      note: `Transfer to ${name}`,
                     },
                   ],
                 }
