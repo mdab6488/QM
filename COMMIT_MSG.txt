@@ -1,0 +1,9 @@
+Replace email/password auth with Google OAuth
+
+- Login page is now a single "Continue with Google" button; removed the
+  email/password sign-in and sign-up flow entirely.
+- Add /auth/callback route handler to exchange the OAuth code for a
+  Supabase session (cookies), with forwarded-host handling for Vercel.
+- Update README auth setup for Google provider + redirect URLs.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

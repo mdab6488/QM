@@ -1,42 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { Field, Input } from "@/components/ui";
 import { CandlestickChart } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-
   const configured = isSupabaseConfigured();
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signInWithGoogle = async () => {
     setError(null);
-    setInfo(null);
     setBusy(true);
     try {
       const supabase = getSupabaseClient();
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setInfo("Account created. If email confirmation is on, check your inbox — otherwise sign in.");
-        setMode("signin");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        router.replace("/trades");
-      }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      // On success the browser is redirected to Google, so nothing else to do.
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
+      setError(err instanceof Error ? err.message : "Could not start Google sign-in.");
       setBusy(false);
     }
   };
@@ -52,13 +39,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <h1 className="text-lg font-semibold">
-          {mode === "signin" ? "Sign in" : "Create account"}
-        </h1>
+        <h1 className="text-lg font-semibold">Sign in</h1>
         <p className="text-sm text-muted mt-1">
-          {mode === "signin"
-            ? "Welcome back — sign in to your cockpit."
-            : "Set up your account to start tracking."}
+          Continue with your Google account to access your cockpit.
         </p>
 
         {!configured && (
@@ -67,50 +50,44 @@ export default function LoginPage() {
           </p>
         )}
 
-        <form className="space-y-3 mt-5" onSubmit={submit}>
-          <Field label="Email">
-            <Input
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-            />
-          </Field>
-          <Field label="Password">
-            <Input
-              type="password"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-          </Field>
-
-          {error && <p className="text-sm text-loss">{error}</p>}
-          {info && <p className="text-sm text-win">{info}</p>}
-
-          <button type="submit" className="btn-primary w-full" disabled={busy || !configured}>
-            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
-          </button>
-        </form>
-
         <button
-          className="text-sm text-muted hover:text-text mt-4 w-full text-center"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-            setInfo(null);
-          }}
+          onClick={signInWithGoogle}
+          disabled={busy || !configured}
+          className="btn-ghost w-full mt-6 justify-center bg-white text-gray-800 hover:bg-gray-100 border-transparent disabled:opacity-50"
         >
-          {mode === "signin"
-            ? "Don't have an account? Create one"
-            : "Already have an account? Sign in"}
+          <GoogleIcon />
+          {busy ? "Redirecting…" : "Continue with Google"}
         </button>
+
+        {error && <p className="text-sm text-loss mt-3">{error}</p>}
+
+        <p className="text-[11px] text-muted mt-6 text-center">
+          New here? Signing in with Google creates your account automatically.
+        </p>
       </div>
     </div>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
   );
 }

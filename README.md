@@ -49,10 +49,20 @@ In the Supabase dashboard, open **SQL Editor** and run the contents of
 [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). It creates the
 `app_state` table and the Row Level Security policies that scope each row to its owner.
 
-### 4. (Optional) email confirmation
+### 4. Enable Google sign-in
 
-By default Supabase may require email confirmation on sign-up. For a personal app you can
-turn it off under **Authentication → Providers → Email** so you can sign in immediately.
+Auth is **Google-only**. Set it up once:
+
+1. In **Google Cloud Console** → APIs & Services → Credentials, create an **OAuth 2.0 Client ID**
+   (type: Web application). Under **Authorized redirect URIs** add your Supabase callback:
+   `https://YOUR-PROJECT.supabase.co/auth/v1/callback`. Copy the **Client ID** and **Client secret**.
+2. In **Supabase → Authentication → Providers → Google**, enable it and paste the Client ID/secret.
+3. In **Supabase → Authentication → URL Configuration**, add your app's callback URLs to
+   **Redirect URLs**:
+   - `http://localhost:3000/auth/callback`
+   - `https://YOUR-DOMAIN/auth/callback`
+
+   and set **Site URL** to your deployed domain.
 
 ### 5. Run locally
 
@@ -62,7 +72,8 @@ npm run dev
 # open http://localhost:3000  → you'll be sent to /login
 ```
 
-Create an account, sign in, then add your first group on the **Money Management** page.
+Click **Continue with Google** (which creates your account on first sign-in), then add your
+first group on the **Money Management** page.
 
 ## Build
 
