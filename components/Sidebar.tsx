@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Wallet,
   ShieldCheck,
@@ -9,26 +9,8 @@ import {
   Newspaper,
   Settings,
   CandlestickChart,
-  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getSupabaseClient } from "@/lib/supabase/client";
-import { stopPersistence } from "@/lib/persistence";
-import { useStore } from "@/lib/store";
-
-function useSignOut() {
-  const router = useRouter();
-  return async () => {
-    try {
-      await getSupabaseClient().auth.signOut();
-    } catch {
-      // ignore — we clear local state regardless
-    }
-    stopPersistence();
-    useStore.getState().reset();
-    router.replace("/login");
-  };
-}
 
 const NAV = [
   { href: "/trades", label: "Money Management", icon: Wallet },
@@ -40,10 +22,8 @@ const NAV = [
 
 export function Sidebar() {
   const path = usePathname();
-  const signOut = useSignOut();
-  const account = useStore((s) => s.account);
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-panel/50 p-4">
+    <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-60 flex-col border-r border-border bg-panel/50 p-4">
       <div className="flex items-center gap-2 px-2 py-3 mb-4">
         <CandlestickChart className="text-brand" size={22} />
         <div>
@@ -70,37 +50,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="mt-auto pt-4">
-        {account && (
-          <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
-            {account.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={account.avatarUrl}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="w-8 h-8 rounded-full shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-brand/20 text-brand grid place-items-center text-sm font-medium shrink-0">
-                {(account.name || account.email || "?").charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0">
-              {account.name && (
-                <div className="text-sm font-medium leading-tight truncate">{account.name}</div>
-              )}
-              <div className="text-[11px] text-muted leading-tight truncate">{account.email}</div>
-            </div>
-          </div>
-        )}
-        <button
-          onClick={signOut}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel2 hover:text-text transition-colors"
-        >
-          <LogOut size={18} /> Sign out
-        </button>
-      </div>
     </aside>
   );
 }
